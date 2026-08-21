@@ -19,7 +19,7 @@ def keep_alive():
     t = Thread(target=run)
     t.start()
 
-BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
+BOT_TOKEN = "MTU0MDI3NjM0NTM2MjQ1NjYzNg.GStI_l.Xw8OReFLTMLxM3BpS4nL-AI3PfsoxmPVk2cZ0U"
 ACCESS_ROLE_ID = 1540280694079496244
 
 intents = discord.Intents.all()
