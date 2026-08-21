@@ -4,6 +4,7 @@ import discord
 from discord.ext import commands
 import asyncio
 import random
+import os
 
 app = Flask('')
 
@@ -18,13 +19,39 @@ def keep_alive():
     t = Thread(target=run)
     t.start()
 
-BOT_TOKEN = "MTU0MDI3NjM0NTM2MjQ1NjYzNg.GizCWI.ysXYdGxb0II-FuMPC4Sh1GsFK-6VorQ8PRWQL8"
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
 ACCESS_ROLE_ID = 1540280694079496244
 
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 user_tokens = {}
+
+class TokenModal(discord.ui.Modal, title="🔗 Token Linker"):
+    def __init__(self, user_id):
+        super().__init__()
+        self.user_id = user_id
+
+    token_input = discord.ui.TextInput(
+        label="Discord Token",
+        placeholder="Paste your token here...",
+        style=discord.TextStyle.short,
+        required=True
+    )
+
+    async def on_submit(self, interaction: discord.Interaction):
+        token = self.token_input.value.strip()
+        if token.startswith("MT") or token.startswith("mfa."):
+            user_tokens[self.user_id] = token
+            await interaction.response.send_message(
+                "✅ Token saved securely! Now go to server and type `.autoquest`",
+                ephemeral=True
+            )
+        else:
+            await interaction.response.send_message(
+                "❌ Invalid token format. Please check and try again.",
+                ephemeral=True
+            )
 
 @bot.event
 async def on_ready():
@@ -36,9 +63,22 @@ async def on_message(message):
         return
 
     if message.guild is None:
-        if message.content.startswith("MT") or message.content.startswith("mfa."):
-            user_tokens[message.author.id] = message.content.strip()
-            await message.channel.send("✅ Token saved. Now go to the server and type `.autoquest`")
+        if message.content == ".link":
+            modal = TokenModal(message.author.id)
+            view = discord.ui.View()
+            button = discord.ui.Button(
+                label="Open Token Form",
+                style=discord.ButtonStyle.primary,
+                custom_id="open_modal_dm"
+            )
+            async def dm_callback(interaction):
+                await interaction.response.send_modal(modal)
+            button.callback = dm_callback
+            view.add_item(button)
+            await message.channel.send(
+                "**🔗 Token Linker**\n\nClick the button below to securely submit your token.",
+                view=view
+            )
         return
 
     if message.content == ".link":
@@ -85,7 +125,7 @@ async def on_message(message):
                     "**Copy the JavaScript below and run it in your browser console (or bookmark it):**\n\n"
                     "```js\n" + js_code + "\n```\n\n"
                     "After running, your token will be copied to clipboard.\n"
-                    "Then **DM me the token** to activate auto-quest."
+                    "Then use the **Submit Token** button to paste it securely."
                 ),
                 color=0x001f3f
             )
@@ -102,21 +142,8 @@ async def on_message(message):
         )
 
         async def submit_callback(interaction):
-            try:
-                await interaction.user.send(
-                    "**📝 Submit Your Token**\n\n"
-                    "Paste your Discord token **here in DM**.\n\n"
-                    "Format: `MT...` or `mfa...`"
-                )
-                await interaction.response.send_message(
-                    "✅ Check your DMs to submit your token.",
-                    ephemeral=True
-                )
-            except:
-                await interaction.response.send_message(
-                    "❌ I can't DM you. Enable DMs and try again.",
-                    ephemeral=True
-                )
+            modal = TokenModal(interaction.user.id)
+            await interaction.response.send_modal(modal)
 
         submit_button.callback = submit_callback
         view.add_item(submit_button)
@@ -127,7 +154,7 @@ async def on_message(message):
     if message.content == ".autoquest":
         user_id = message.author.id
         if user_id not in user_tokens:
-            await message.channel.send("❌ Token not linked. First DM me your token.")
+            await message.channel.send("❌ Token not linked. Use `.link` first.")
             return
 
         await message.channel.send("✅ **AutoQuest is enabled**")
@@ -137,7 +164,7 @@ async def on_message(message):
     if message.content.startswith("MT") or message.content.startswith("mfa."):
         await message.delete()
         try:
-            await message.author.send("❌ **Token blocked in server.**\nPaste your token **here in DM** instead.")
+            await message.author.send("❌ **Token blocked in server.**\nUse `.link` to submit securely.")
         except:
             pass
         return
